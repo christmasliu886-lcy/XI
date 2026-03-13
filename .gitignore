@@ -1,0 +1,8 @@
+# 忽略敏感文件
+.openclaw/
+.clawhub/
+skills/
+
+# 忽略大文件
+*.log
+*.tmp
