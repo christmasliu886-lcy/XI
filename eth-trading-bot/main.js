@@ -16,7 +16,8 @@ let positions = [];  // 当前持仓
 let dailyPL = 0;     // 今日盈亏
 let lastDailyReset = new Date().setHours(0, 0, 0, 0);  // 上次重置日期
 let lastSignalTime = 0;  // 上次信号时间（避免频繁）
-let lastReportTime = 0;  // 上次30分钟汇报时间
+let lastWarningTime = 0;  // 上次警告时间
+let lastReportTime = Date.now() - 31 * 60 * 1000;  // 上次30分钟汇报时间（初始化为31分钟前）
 let last9amReportTime = 0;  // 上次9点汇报时间
 let systemStartTime = Date.now();  // 系统启动时间
 let lastLoopTime = Date.now();  // 上次循环时间
@@ -185,11 +186,14 @@ async function mainLoop() {
       console.log(`持仓中... 盈亏: ${(openPositions[0].profitPct * 100).toFixed(2)}%`);
     }
     
-    // 3. 检查是否可以开仓
+    // 3. 检查是否可以开仓 (警告每30分钟最多发一次)
     const canOpen = trading.canOpenPosition(dailyPL, 0);
     if (!canOpen.allowed) {
       console.log(`不能开仓: ${canOpen.reason}`);
-      await notifier.notifyWarning(canOpen.reason);
+      if (now - lastWarningTime > 30 * 60 * 1000) {
+        lastWarningTime = now;
+        await notifier.notifyWarning(canOpen.reason);
+      }
       return;
     }
     
@@ -201,9 +205,9 @@ async function mainLoop() {
       return;
     }
     
-    // 5. 避免频繁开仓 (5分钟内不重复)
+    // 5. 避免频繁开仓 (30分钟内不重复)
     const now = Date.now();
-    if (now - lastSignalTime < 5 * 60 * 1000) {
+    if (now - lastSignalTime < 30 * 60 * 1000) {
       console.log('信号太频繁，跳过');
       return;
     }
@@ -265,9 +269,6 @@ async function mainLoop() {
     await notifier.notifyOpenPosition(position);
     
     console.log(`✅ 开仓完成! ${openResult.simulation ? '(模拟模式)' : '(实盘)'}`);
-    
-    // 11. 状态汇报 (每30分钟 + 每天9点)
-    await sendReport(currentPrice);
     
   } catch (error) {
     console.error('主循环错误:', error);
