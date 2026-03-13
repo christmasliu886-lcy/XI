@@ -67,47 +67,45 @@ async function generateStatusReport(currentPrice) {
   return report;
 }
 
-// 发送汇报
+// 发送汇报 - 只在整点或半点发送
 async function sendReport(currentPrice, forceNineAm = false) {
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
-  const isNineAm = currentHour === 9 && currentMinute < 10;
-  const isHalfHour = currentMinute === 0 || currentMinute === 30;
+  const currentSecond = now.getSeconds();
   
-  // 检查是否需要30分钟汇报
-  const thirtyMinInterval = 30 * 60 * 1000; // 30分钟
+  // 只在整点或半点的前10秒内发送（避免重复）
+  const isHalfHour = (currentMinute === 0 || currentMinute === 30) && currentSecond < 10;
+  const isNineAm = currentHour === 9 && currentMinute < 10 && currentSecond < 10;
+  
+  // 检查是否需要30分钟汇报（间隔30分钟以上）
+  const thirtyMinInterval = 30 * 60 * 1000;
   const shouldHalfHourReport = isHalfHour && (Date.now() - lastReportTime) > thirtyMinInterval;
   
   // 检查是否需要9点汇报
   const shouldNineAmReport = isNineAm && (Date.now() - last9amReportTime) > 24 * 60 * 60 * 1000;
   
   if (shouldHalfHourReport || shouldNineAmReport || forceNineAm) {
-    const report = await generateStatusReport(currentPrice);
+    // 如果传入的价格是0，获取当前价格
+    let price = currentPrice;
+    if (!price || price === 0) {
+      price = await okx.getCurrentPrice();
+    }
+    
+    const report = await generateStatusReport(price);
     console.log(report);
     await notifier.sendTelegramMessage(report);
     
-    if (shouldHalfHourReport) lastReportTime = Date.now();
+    if (shouldHalfHourReport) {
+      lastReportTime = Date.now();
+      console.log('✅ 已发送状态汇报');
+    }
     if (shouldNineAmReport) last9amReportTime = Date.now();
   }
 }
 
 // 主循环
-let lastReportCheck = 0;
-
 async function mainLoop() {
-  const now = Date.now();
-  
-  // 每分钟检查一次是否需要发送汇报（但只在整点或半点附近发送）
-  if (now - lastReportCheck > 60000) {
-    lastReportCheck = now;
-    const currentMinute = new Date().getMinutes();
-    const isHalfHour = currentMinute === 0 || currentMinute === 30;
-    if (isHalfHour) {
-      await sendReport(0); // 价格后面会更新
-    }
-  }
-  
   console.log(`\n[${new Date().toISOString()}] 检查交易信号...`);
   
   try {
