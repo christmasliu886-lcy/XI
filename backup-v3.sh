@@ -2,6 +2,12 @@
 # OpenClaw 备份脚本 v3.0
 # 结合官方备份 + GitHub 同步 + 飞书通知
 
+set -e
+
+# 切换到 Node 22
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && nvm use 22 >/dev/null 2>&1
+
 BACKUP_DIR="$HOME/openclaw-backups"
 KEEP_COUNT=3  # 最多保留 3 份，超出后循环覆盖
 GITHUB_REPO="christmasliu886-lcy/XI"
